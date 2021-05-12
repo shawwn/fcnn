@@ -45,6 +45,9 @@ def main():
     train_set = datasets.MNIST('data/mnist', download=True, transform=tf)
     train_dl = data.DataLoader(train_set, BATCH_SIZE, shuffle=True,
                                num_workers=1, pin_memory=True)
+    val_set = datasets.MNIST('data/mnist', train=False, download=True, transform=tf)
+    val_dl = data.DataLoader(train_set, BATCH_SIZE, num_workers=2, pin_memory=True)
+
 
     # model = nn.Sequential(
     #     nn.Linear(LATENT_SIZE, 16 * 7 * 7),
@@ -140,6 +143,18 @@ def main():
                 #     print('Layer weight norms:',
                 #           *(f'{norm.item():g}' for norm in mdmm_return.fn_values))
 
+    def val():
+        print('Validating...')
+        model.eval()
+        losses = []
+        for inputs, targets in val_dl:
+            inputs = inputs.to(device, non_blocking=True)
+            targets = targets.to(device, non_blocking=True)
+            outputs = model(inputs)
+            loss = crit(outputs, targets)
+            losses.append(loss * len(outputs))
+        loss = sum(losses) / len(val_set)
+        print(f'Validation loss: {loss.item():g}')
 
     # @torch.no_grad()
     # @torch.random.fork_rng()
@@ -159,8 +174,9 @@ def main():
         for epoch in range(1, EPOCHS + 1):
             print('Epoch', epoch)
             train()
+            val()
             # demo()
-            save()
+            # save()
     except KeyboardInterrupt:
         pass
 
