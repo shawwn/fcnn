@@ -21,7 +21,7 @@ BATCH_SIZE = 50
 BIG_BATCH_SIZE = 500
 EPOCHS = 100
 LATENT_SIZE = 32
-PREFIX = 'mnist_imle_vgg'
+PREFIX = 'mnist_classifier'
 
 
 class ConvBlock(nn.Sequential):
@@ -76,6 +76,20 @@ def main():
     #     nn.Linear(1024, 128), nn.Tanh(),
     # ).to(device)
 
+    # model = nn.Sequential(
+    #     nn.Conv2d(1, 32, 3, padding=1), nn.ReLU(inplace=True),
+    #     # nn.MaxPool2d(2),
+    #     nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(inplace=True),
+    #     nn.MaxPool2d(2),
+    #     nn.Flatten(),
+    #     nn.Linear(12544, 128), nn.ReLU(inplace=True),
+    #     nn.Linear(128, 10), nn.Softmax(),
+    #     # # nn.Linear(16 * 7 * 7, 10),
+    #     # nn.Linear(128, 10),
+    #     # nn.ReLU(inplace=True),
+    #     # nn.Softmax(),
+    # ).to(device)
+
     model = nn.Sequential(
         nn.Conv2d(1, 16, 3, padding=1),
         nn.ReLU(inplace=True),
@@ -87,16 +101,10 @@ def main():
         nn.Linear(16 * 7 * 7, 10),
     ).to(device)
 
+
     print('Parameters:', sum(map(lambda x: x.numel(), model.parameters())))
 
     crit = nn.CrossEntropyLoss()
-
-    # vgg = Loss().to(device)
-    #
-    # def crit(fakes, reals):
-    #     out = fakes.unsqueeze(0) - reals.unsqueeze(1)
-    #     out = out.pow(2).mean([2, 3, 4])
-    #     return out.min(1).values.mean()
 
     opt = optim.Adam(model.parameters(), lr=1e-3)
 
@@ -105,43 +113,19 @@ def main():
             model.train()
             losses = []
             i = 0
-            # for x, _ in train_dl:
-            #     i += 1
-            #     x = x.to(device, non_blocking=True)
-            #     xf = vgg.get_features(torch.cat([x, x, x], dim=1))
-            #     z = torch.randn([BIG_BATCH_SIZE, LATENT_SIZE], device=device)
-            #     gz = model(z)
-            #     gzf = vgg.get_features(torch.cat([gz, gz, gz], dim=1))
-            #     opt.zero_grad()
-            #     loss = crit(gzf, xf)
-            #     losses.append(loss.item())
-            #     loss.backward()
-            #     opt.step()
-            #     pbar.update(len(x))
-            #     if i % 50 == 0:
-            #         tqdm.write(f'{i * BATCH_SIZE} {sum(losses[-50:]) / 50:g}')
-            #     if i % 500 == 0:
-            #         demo()
-            #         model.train()
             for inputs, targets in train_dl:
                 i += 1
                 inputs = inputs.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
                 outputs = model(inputs)
+                opt.zero_grad()
                 loss = crit(outputs, targets)
                 losses.append(loss)
-                # mdmm_return = mdmm_module(loss)
-                # writer.writerow([loss.item(), *(norm.item() for norm in mdmm_return.fn_values)])
-                opt.zero_grad()
-                # mdmm_return.value.backward()
+                loss.backward()
                 opt.step()
                 pbar.update(len(inputs))
                 if i % 50 == 0:
                     tqdm.write(f'{i * BATCH_SIZE} {sum(losses[-50:]) / 50:g}')
-                # if i % 100 == 0:
-                #     print(f'{i} {sum(losses[-100:]) / 100:g}')
-                #     print('Layer weight norms:',
-                #           *(f'{norm.item():g}' for norm in mdmm_return.fn_values))
 
     def val():
         print('Validating...')
@@ -156,16 +140,6 @@ def main():
         loss = sum(losses) / len(val_set)
         print(f'Validation loss: {loss.item():g}')
 
-    # @torch.no_grad()
-    # @torch.random.fork_rng()
-    # def demo():
-    #     model.eval()
-    #     torch.manual_seed(0)
-    #     z = torch.randn([100, LATENT_SIZE], device=device)
-    #     grid = utils.make_grid(model(z), 10).cpu()
-    #     TF.to_pil_image(grid).save('demo.png')
-    #     tqdm.write('Wrote examples to demo.png.')
-
     def save():
         torch.save({'model': model.state_dict(), 'opt': opt.state_dict()}, PREFIX + '.pth')
         print(f'Wrote checkpoint to {PREFIX}.pth.')
@@ -175,8 +149,7 @@ def main():
             print('Epoch', epoch)
             train()
             val()
-            # demo()
-            # save()
+            save()
     except KeyboardInterrupt:
         pass
 

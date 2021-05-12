@@ -292,4 +292,4 @@ bazel-*
 
 # project-specific ignores
 data/
-mnist_imle_vgg.pth
+*.pth
