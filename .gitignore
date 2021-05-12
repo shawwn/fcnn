@@ -288,3 +288,8 @@ TAGS
 
 # bazel symlinks
 bazel-*
+
+
+# project-specific ignores
+data/
+mnist_imle_vgg.pth
