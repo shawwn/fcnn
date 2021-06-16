@@ -46,7 +46,7 @@ def main():
     train_dl = data.DataLoader(train_set, BATCH_SIZE, shuffle=True,
                                num_workers=1, pin_memory=True)
     val_set = datasets.MNIST('data/mnist', train=False, download=True, transform=tf)
-    val_dl = data.DataLoader(train_set, BATCH_SIZE, num_workers=2, pin_memory=True)
+    val_dl = data.DataLoader(val_set, BATCH_SIZE, num_workers=2, pin_memory=True)
 
 
     # model = nn.Sequential(
@@ -107,6 +107,7 @@ def main():
     crit = nn.CrossEntropyLoss()
 
     opt = optim.Adam(model.parameters(), lr=1e-3)
+    # opt = optim.SGD(model.parameters(), lr=0.5)
 
     def train():
         with tqdm(total=len(train_set), unit='samples', dynamic_ncols=True) as pbar:
@@ -120,8 +121,9 @@ def main():
                 outputs = model(inputs)
                 opt.zero_grad()
                 loss = crit(outputs, targets)
-                losses.append(loss)
+                losses.append(loss.item())
                 loss.backward()
+                # import pdb; pdb.set_trace()
                 opt.step()
                 pbar.update(len(inputs))
                 if i % 50 == 0:
@@ -130,21 +132,32 @@ def main():
     def val():
         print('Validating...')
         model.eval()
-        losses = []
-        for inputs, targets in val_dl:
-            inputs = inputs.to(device, non_blocking=True)
-            targets = targets.to(device, non_blocking=True)
-            outputs = model(inputs)
-            loss = crit(outputs, targets)
-            losses.append(loss * len(outputs))
-        loss = sum(losses) / len(val_set)
-        print(f'Validation loss: {loss.item():g}')
+        correct = 0
+        total = len(val_set)
+        #with tqdm(total=total, unit='samples', dynamic_ncols=True) as pbar, torch.no_grad():
+        #with torch.no_grad():
+        if True:
+            losses = []
+            for inputs, targets in val_dl:
+                inputs = inputs.to(device, non_blocking=True)
+                targets = targets.to(device, non_blocking=True)
+                outputs = model(inputs)
+                loss = crit(outputs, targets)
+                losses.append(loss * len(outputs))
+                pred = outputs.data.max(1, keepdim=True)[1]
+                correct += pred.eq(targets.data.view_as(pred)).sum()
+                #pbar.update(len(inputs))
+            loss = sum(losses) / len(val_set)
+        print(f'Validation loss: {loss.item():g} Accuracy: {correct}/{total} ({correct/total*100:.2f}%)')
+        print('')
+        print('')
 
     def save():
         torch.save({'model': model.state_dict(), 'opt': opt.state_dict()}, PREFIX + '.pth')
         print(f'Wrote checkpoint to {PREFIX}.pth.')
 
     try:
+        val()
         for epoch in range(1, EPOCHS + 1):
             print('Epoch', epoch)
             train()
